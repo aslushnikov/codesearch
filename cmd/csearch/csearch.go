@@ -180,19 +180,16 @@ func Main() {
 
 	for _, fileid := range post {
 		name := ix.Name(fileid)
-		g.File(name)
+                fmt.Fprintf(g.Stdout, "%s\n", name);
+                g.Limit--
+		//g.File(name)
 		if g.Limit == 0 {
 			break
 		}
 	}
-
-	matches = g.Match
 }
 
 func main() {
 	Main()
-	if !matches {
-		os.Exit(1)
-	}
 	os.Exit(0)
 }
