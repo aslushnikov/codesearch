@@ -15,7 +15,7 @@ import (
 	"codesearch/regexp"
 )
 
-var usageMessage = `usage: csearch [-c] [-f fileregexp] [-h] [-i] [-l] [-n] regexp
+var usageMessage = `usage: csearch [-c] [--allow-files fileregexp] [--block-files fileregexp] [-h] [-i] [-l] [-n] regexp
 
 Csearch behaves like grep over all indexed files, searching for regexp,
 an RE2 (nearly PCRE) regular expression.
@@ -24,8 +24,11 @@ The -c, -h, -i, -l, and -n flags are as in grep, although note that as per Go's
 flag parsing convention, they cannot be combined: the option pair -i -n 
 cannot be abbreviated to -in.
 
-The -f flag restricts the search to files whose names match the RE2 regular
-expression fileregexp.
+The --allow-files flag restricts the search to files whose names match the RE2 regular
+expression fileregexp. Multiple flags treated as AND.
+
+The --block-files flag restricts the search to files whose names DOES NOT match the RE2 regular
+expression fileregexp. Multiple flags treated as OR.
 
 Csearch relies on the existence of an up-to-date index created ahead of time.
 To build or rebuild the index that csearch uses, run:
@@ -65,7 +68,8 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
-var fFlags arrayFlags
+var allowFiles arrayFlags
+var blockFiles arrayFlags
 
 func Main() {
 	g := regexp.Grep{
@@ -73,7 +77,8 @@ func Main() {
 		Stderr: os.Stderr,
 	}
 	g.AddFlags()
-	flag.Var(&fFlags, "f", "search only files with names matching this regexp")
+	flag.Var(&allowFiles, "allow-files", "search only files with names matching this regexp")
+	flag.Var(&blockFiles, "block-files", "do not search files with names matching this regexp")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -102,15 +107,26 @@ func Main() {
 		log.Fatal(err)
 	}
 	g.Regexp = re
-	var fres = make([]*regexp.Regexp, 0, len(fFlags))
-	if len(fFlags) > 0 {
-		for _, fFlag := range fFlags {
+	var allowFres = make([]*regexp.Regexp, 0, len(allowFiles))
+	if len(allowFiles) > 0 {
+		for _, fFlag := range allowFiles {
 
 			var fre, err = regexp.Compile(fFlag)
 			if err != nil {
 				log.Fatal(err)
 			}
-			fres = append(fres, fre)
+			allowFres = append(allowFres, fre)
+		}
+	}
+	var blockFres = make([]*regexp.Regexp, 0, len(blockFiles))
+	if len(blockFiles) > 0 {
+		for _, fFlag := range blockFiles {
+
+			var fre, err = regexp.Compile(fFlag)
+			if err != nil {
+				log.Fatal(err)
+			}
+			blockFres = append(blockFres, fre)
 		}
 	}
 	q := index.RegexpQuery(re.Syntax)
@@ -130,19 +146,28 @@ func Main() {
 		log.Printf("post query identified %d possible files\n", len(post))
 	}
 
-	if len(fres) > 0 {
+	if len(allowFres) > 0 || len(blockFres) > 0 {
 		fnames := make([]uint32, 0, len(post))
 
 		for _, fileid := range post {
 			name := ix.Name(fileid)
 			var matches = true
-			for _, fre := range fres {
+			for _, fre := range allowFres {
 				if fre.MatchString(name, true, true) < 0 {
 					matches = false
 					break
 				}
 			}
-			if matches == true {
+			if !matches {
+				continue
+			}
+			for _, fre := range blockFres {
+				if fre.MatchString(name, true, true) >= 0 {
+					matches = false
+					break
+				}
+			}
+			if matches {
 				fnames = append(fnames, fileid)
 			}
 		}
