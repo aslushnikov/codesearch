@@ -11,7 +11,7 @@ import (
 	"os"
 	"runtime/pprof"
 
-        "codesearch/index"
+	"codesearch/index"
 	"codesearch/regexp"
 )
 
@@ -46,7 +46,6 @@ func usage() {
 }
 
 var (
-	fFlag       = flag.String("f", "", "search only files with names matching this regexp")
 	iFlag       = flag.Bool("i", false, "case-insensitive search")
 	verboseFlag = flag.Bool("verbose", false, "print extra information")
 	bruteFlag   = flag.Bool("brute", false, "brute force - search all files in index")
@@ -55,12 +54,26 @@ var (
 	matches bool
 )
 
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return "my string representation"
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
+var fFlags arrayFlags
+
 func Main() {
 	g := regexp.Grep{
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
 	}
 	g.AddFlags()
+	flag.Var(&fFlags, "f", "search only files with names matching this regexp")
 
 	flag.Usage = usage
 	flag.Parse()
@@ -89,11 +102,15 @@ func Main() {
 		log.Fatal(err)
 	}
 	g.Regexp = re
-	var fre *regexp.Regexp
-	if *fFlag != "" {
-		fre, err = regexp.Compile(*fFlag)
-		if err != nil {
-			log.Fatal(err)
+	var fres = make([]*regexp.Regexp, 0, len(fFlags))
+	if len(fFlags) > 0 {
+		for _, fFlag := range fFlags {
+
+			var fre, err = regexp.Compile(fFlag)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fres = append(fres, fre)
 		}
 	}
 	q := index.RegexpQuery(re.Syntax)
@@ -113,15 +130,21 @@ func Main() {
 		log.Printf("post query identified %d possible files\n", len(post))
 	}
 
-	if fre != nil {
+	if len(fres) > 0 {
 		fnames := make([]uint32, 0, len(post))
 
 		for _, fileid := range post {
 			name := ix.Name(fileid)
-			if fre.MatchString(name, true, true) < 0 {
-				continue
+			var matches = true
+			for _, fre := range fres {
+				if fre.MatchString(name, true, true) < 0 {
+					matches = false
+					break
+				}
 			}
-			fnames = append(fnames, fileid)
+			if matches == true {
+				fnames = append(fnames, fileid)
+			}
 		}
 
 		if *verboseFlag {
@@ -133,9 +156,9 @@ func Main() {
 	for _, fileid := range post {
 		name := ix.Name(fileid)
 		g.File(name)
-                if g.Limit == 0 {
-                    break
-                }
+		if g.Limit == 0 {
+			break
+		}
 	}
 
 	matches = g.Match
