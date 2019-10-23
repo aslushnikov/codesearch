@@ -49,10 +49,11 @@ func usage() {
 }
 
 var (
-	iFlag       = flag.Bool("i", false, "case-insensitive search")
-	verboseFlag = flag.Bool("verbose", false, "print extra information")
-	bruteFlag   = flag.Bool("brute", false, "brute force - search all files in index")
-	cpuProfile  = flag.String("cpuprofile", "", "write cpu profile to this file")
+	iFlag              = flag.Bool("i", false, "case-insensitive search")
+	onlyListCandidates = flag.Bool("only-list-candidates", false, "list only file candidates for matches")
+	verboseFlag        = flag.Bool("verbose", false, "print extra information")
+	bruteFlag          = flag.Bool("brute", false, "brute force - search all files in index")
+	cpuProfile         = flag.String("cpuprofile", "", "write cpu profile to this file")
 
 	matches bool
 )
@@ -180,9 +181,12 @@ func Main() {
 
 	for _, fileid := range post {
 		name := ix.Name(fileid)
-                fmt.Fprintf(g.Stdout, "%s\n", name);
-                g.Limit--
-		//g.File(name)
+		if *onlyListCandidates {
+			fmt.Fprintf(g.Stdout, "%s\n", name)
+			g.Limit--
+		} else {
+			g.File(name)
+		}
 		if g.Limit == 0 {
 			break
 		}
