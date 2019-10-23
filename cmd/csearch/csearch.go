@@ -11,8 +11,8 @@ import (
 	"os"
 	"runtime/pprof"
 
-	"github.com/google/codesearch/index"
-	"github.com/google/codesearch/regexp"
+        "codesearch/index"
+	"codesearch/regexp"
 )
 
 var usageMessage = `usage: csearch [-c] [-f fileregexp] [-h] [-i] [-l] [-n] regexp
@@ -133,6 +133,9 @@ func Main() {
 	for _, fileid := range post {
 		name := ix.Name(fileid)
 		g.File(name)
+                if g.Limit == 0 {
+                    break
+                }
 	}
 
 	matches = g.Match

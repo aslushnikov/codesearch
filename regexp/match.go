@@ -353,6 +353,7 @@ type Grep struct {
 	Regexp *Regexp   // regexp to search for
 	Stdout io.Writer // output target
 	Stderr io.Writer // error target
+        Limit int // Maximum matches
 
 	L bool // L flag - print file names only
 	C bool // C flag - print count of matches
@@ -369,6 +370,7 @@ func (g *Grep) AddFlags() {
 	flag.BoolVar(&g.C, "c", false, "print match counts only")
 	flag.BoolVar(&g.N, "n", false, "show line numbers")
 	flag.BoolVar(&g.H, "h", false, "omit file names")
+	flag.IntVar(&g.Limit, "limit", 1000000, "limit total matches")
 }
 
 func (g *Grep) File(name string) {
@@ -425,13 +427,14 @@ func (g *Grep) Reader(r io.Reader, name string) {
 			endText = true
 		}
 		chunkStart := 0
-		for chunkStart < end {
+		for chunkStart < end && g.Limit > 0 {
 			m1 := g.Regexp.Match(buf[chunkStart:end], beginText, endText) + chunkStart
 			beginText = false
 			if m1 < chunkStart {
 				break
 			}
 			g.Match = true
+                        g.Limit--;
 			if g.L {
 				fmt.Fprintf(g.Stdout, "%s\n", name)
 				return
