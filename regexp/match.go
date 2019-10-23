@@ -7,7 +7,6 @@ package regexp
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -408,9 +407,13 @@ func (g *Grep) Reader(r io.Reader, name string) {
 		needLineno = g.N
 		lineno     = 1
 		count      = 0
+		prefix     = ""
 		beginText  = true
 		endText    = false
 	)
+	if !g.H {
+		prefix = name + ":"
+	}
 	for {
 		n, err := io.ReadFull(r, buf[len(buf):cap(buf)])
 		buf = buf[:len(buf)+n]
@@ -433,8 +436,7 @@ func (g *Grep) Reader(r io.Reader, name string) {
 			g.Match = true
 			g.Limit--
 			if g.L {
-				var nameString, _ = json.Marshal(name)
-				fmt.Fprintf(g.Stdout, "{\"path\":%s}\n", nameString)
+				fmt.Fprintf(g.Stdout, "%s\n", name)
 				return
 			}
 			lineStart := bytes.LastIndex(buf[chunkStart:m1], nl) + 1 + chunkStart
@@ -446,17 +448,17 @@ func (g *Grep) Reader(r io.Reader, name string) {
 				lineno += countNL(buf[chunkStart:lineStart])
 			}
 			line := buf[lineStart:lineEnd]
+			nl := ""
+			if len(line) == 0 || line[len(line)-1] != '\n' {
+				nl = "\n"
+			}
 			switch {
 			case g.C:
 				count++
 			case g.N:
-				var nameString, _ = json.Marshal(name)
-				var ctxString, _ = json.Marshal(string(line))
-				fmt.Fprintf(g.Stdout, "{\"path\":%s, \"lineNumber\": %d, \"ctx\": %s}\n", nameString, lineno, ctxString)
+				fmt.Fprintf(g.Stdout, "%s%d:%s%s", prefix, lineno, line, nl)
 			default:
-				var nameString, _ = json.Marshal(name)
-				var ctxString, _ = json.Marshal(string(line))
-				fmt.Fprintf(g.Stdout, "{\"path\":%s, \"ctx\": %s}\n", nameString, ctxString)
+				fmt.Fprintf(g.Stdout, "%s%s%s", prefix, line, nl)
 			}
 			if needLineno {
 				lineno++
@@ -476,7 +478,6 @@ func (g *Grep) Reader(r io.Reader, name string) {
 		}
 	}
 	if g.C && count > 0 {
-		var nameString, _ = json.Marshal(name)
-		fmt.Fprintf(g.Stdout, "{\"path\": %s, \"count\": %d}\n", nameString, count)
+		fmt.Fprintf(g.Stdout, "%s: %d\n", name, count)
 	}
 }
