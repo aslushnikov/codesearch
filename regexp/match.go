@@ -353,7 +353,7 @@ type Grep struct {
 	Regexp *Regexp   // regexp to search for
 	Stdout io.Writer // output target
 	Stderr io.Writer // error target
-        Limit int // Maximum matches
+	Limit  int       // Maximum matches
 
 	L bool // L flag - print file names only
 	C bool // C flag - print count of matches
@@ -434,7 +434,7 @@ func (g *Grep) Reader(r io.Reader, name string) {
 				break
 			}
 			g.Match = true
-                        g.Limit--;
+			g.Limit--
 			if g.L {
 				fmt.Fprintf(g.Stdout, "%s\n", name)
 				return
